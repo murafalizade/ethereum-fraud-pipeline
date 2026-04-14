@@ -15,7 +15,7 @@ class KafkaEthConsumer:
         )
         self.graph = GraphDb()
 
-    async def start(self):
+    async def process(self):
         await self.consumer.start()
 
         try:

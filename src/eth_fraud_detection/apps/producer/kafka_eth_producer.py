@@ -6,7 +6,7 @@ from aiokafka import AIOKafkaProducer
 from eth_fraud_detection.core.constants import TRANSACTION_WRITER_TOPIC
 
 # Use Environment Variables for security
-API_KEY = os.getenv("ALCHEMY_ETH_API_KEY", "z6o_inQRnUeeb8QjhES_G")
+API_KEY = os.getenv("ALCHEMY_ETH_API_KEY")
 URL = f'wss://eth-mainnet.g.alchemy.com/v2/{API_KEY}'
 
 class KafkaEthProducer:

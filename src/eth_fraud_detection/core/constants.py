@@ -1,0 +1,1 @@
+TRANSACTION_WRITER_TOPIC:str = "eth-transactions"
