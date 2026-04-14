@@ -4,6 +4,7 @@ import websockets
 from aiokafka import AIOKafkaProducer
 
 from eth_fraud_detection.core.constants import TRANSACTION_WRITER_TOPIC
+from eth_fraud_detection.utils.logger import eth_logger
 
 # Use Environment Variables for security
 API_KEY = os.getenv("ALCHEMY_ETH_API_KEY")
@@ -19,7 +20,7 @@ class KafkaEthProducer:
 
     async def listen(self):
         await self.producer.start()
-        print("Kafka Producer Started. Listening to Ethereum...")
+        eth_logger.info("Kafka Producer Started. Listening to Ethereum...")
 
         try:
             async with websockets.connect(URL) as ws:
@@ -45,7 +46,7 @@ class KafkaEthProducer:
                     await self.producer.send_and_wait(TRANSACTION_WRITER_TOPIC, tx)
 
         except Exception as e:
-            print(f"Error: {e}")
+            eth_logger.error("Error")
         finally:
             await self.producer.stop()
-            print("Producer stopped.")
+            eth_logger.info("Kafka Producer Stopped.")

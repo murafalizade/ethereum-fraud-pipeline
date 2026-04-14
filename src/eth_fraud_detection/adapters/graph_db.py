@@ -4,6 +4,8 @@ import pandas as pd
 from neo4j import AsyncGraphDatabase
 from karateclub.node_embedding.neighbourhood import RandNE
 
+from eth_fraud_detection.utils.logger import eth_logger
+
 # Use bolt://localhost:7687 if running the script on your host machine
 NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USER = "neo4j"
@@ -76,7 +78,7 @@ class GraphDb:
             SET a.signature = item.sig
             """
             await session.run(write_query, data=batch_data)
-            print(f"Successfully updated signatures for {len(batch_data)} nodes.")
+            eth_logger.info(f"Successfully updated signatures for {len(batch_data)} nodes.")
 
 
 async def main():
