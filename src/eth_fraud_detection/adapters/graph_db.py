@@ -80,6 +80,56 @@ class GraphDb:
             await session.run(write_query, data=batch_data)
             eth_logger.info(f"Successfully updated signatures for {len(batch_data)} nodes.")
 
+    async def get_tx_features(self, tx_hash: str) -> dict | None:
+        query = """
+        MATCH (from:Address)-[:SENT]->(tx:Transaction {hash: $hash})-[:TO]->(to:Address)
+        WHERE tx.is_extracted IS NULL
+        SET tx.is_extracted = true
+        RETURN
+            tx.hash                                                             AS tx_hash,
+            from.address                                                        AS from_address,
+            tx.value_eth                                                        AS value_eth,
+            tx.gasPrice_gwei                                                    AS gasPrice_gwei,
+            tx.nonce                                                            AS nonce,
+            size([(from)-[:SENT]->() | 1])                                     AS out_degree,
+            size([()-[:TO]->(from) | 1])                                       AS in_degree,
+            size([(from)-[:SENT]->(t)-[:TO]->(x) | x])                        AS unique_counterparties,
+            reduce(s = 0.0, t IN [(from)-[:SENT]->(t) | t.value_eth] | s + t) AS total_volume,
+            reduce(s = 0.0, t IN [(from)-[:SENT]->(t) | t.value_eth] | s + t)
+                / nullif(size([(from)-[:SENT]->() | 1]), 0)                   AS avg_tx_value
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query, hash=tx_hash)
+            record = await result.single()
+
+        if record is None:
+            return None
+
+        return {
+            "tx_hash":               record["tx_hash"],
+            "from_address":          record["from_address"],
+            "value_eth":             record["value_eth"],
+            "gasPrice_gwei":         record["gasPrice_gwei"],
+            "nonce":                 record["nonce"],
+            "out_degree":            record["out_degree"],
+            "in_degree":             record["in_degree"],
+            "unique_counterparties": record["unique_counterparties"],
+            "total_volume":          record["total_volume"],
+            "avg_tx_value":          record["avg_tx_value"],
+        }
+
+    async def get_unextracted_tx_hashes(self, batch_size: int = 1000) -> list[str]:
+        query = """
+        MATCH (tx:Transaction)
+        WHERE tx.is_extracted IS NULL
+        RETURN tx.hash AS tx_hash
+        LIMIT $batch_size
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query, batch_size=batch_size)
+            return [record["tx_hash"] async for record in result]
+        return None
+
 
 async def main():
     db = GraphDb()
