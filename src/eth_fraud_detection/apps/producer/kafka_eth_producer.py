@@ -1,13 +1,13 @@
 import json
-import os
 import websockets
 from aiokafka import AIOKafkaProducer
 
+from eth_fraud_detection.core.config import get_common_settings
 from eth_fraud_detection.core.constants import TRANSACTION_WRITER_TOPIC
 from eth_fraud_detection.utils.logger import eth_logger
 
-# Use Environment Variables for security
-API_KEY = os.getenv("ALCHEMY_ETH_API_KEY")
+settings = get_common_settings()
+API_KEY = settings.alchemy_eth_api_key
 URL = f'wss://eth-mainnet.g.alchemy.com/v2/{API_KEY}'
 
 class KafkaEthProducer:

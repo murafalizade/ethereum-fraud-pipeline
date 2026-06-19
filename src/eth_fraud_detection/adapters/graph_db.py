@@ -1,20 +1,16 @@
-import asyncio
 import networkx as nx
 import pandas as pd
 from neo4j import AsyncGraphDatabase
 from karateclub.node_embedding.neighbourhood import RandNE
 
+from eth_fraud_detection.core.config import get_neo4j_settings
 from eth_fraud_detection.utils.logger import eth_logger
-
-# Use bolt://localhost:7687 if running the script on your host machine
-NEO4J_URI = "bolt://localhost:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASS = "password123"
 
 
 class GraphDb:
     def __init__(self):
-        self.driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
+        settings = get_neo4j_settings()
+        self.driver = AsyncGraphDatabase.driver(settings.uri, auth=(settings.user, settings.password))
 
     async def close(self):
         await self.driver.close()
@@ -98,25 +94,29 @@ class GraphDb:
             reduce(s = 0.0, t IN [(from)-[:SENT]->(t) | t.value_eth] | s + t)
                 / nullif(size([(from)-[:SENT]->() | 1]), 0)                   AS avg_tx_value
         """
-        async with self.driver.session() as session:
-            result = await session.run(query, hash=tx_hash)
-            record = await result.single()
+        try:
+            async with self.driver.session() as session:
+                result = await session.run(query, hash=tx_hash)
+                record = await result.single()
 
-        if record is None:
-            return None
+            if record is None:
+                return None
 
-        return {
-            "tx_hash":               record["tx_hash"],
-            "from_address":          record["from_address"],
-            "value_eth":             record["value_eth"],
-            "gasPrice_gwei":         record["gasPrice_gwei"],
-            "nonce":                 record["nonce"],
-            "out_degree":            record["out_degree"],
-            "in_degree":             record["in_degree"],
-            "unique_counterparties": record["unique_counterparties"],
-            "total_volume":          record["total_volume"],
-            "avg_tx_value":          record["avg_tx_value"],
-        }
+            return {
+                "tx_hash":               record["tx_hash"],
+                "from_address":          record["from_address"],
+                "value_eth":             record["value_eth"],
+                "gasPrice_gwei":         record["gasPrice_gwei"],
+                "nonce":                 record["nonce"],
+                "out_degree":            record["out_degree"],
+                "in_degree":             record["in_degree"],
+                "unique_counterparties": record["unique_counterparties"],
+                "total_volume":          record["total_volume"],
+                "avg_tx_value":          record["avg_tx_value"],
+            }
+        except Exception as e:
+            eth_logger.error(msg = f"Failed to get tx_hash for {tx_hash}")
+            raise e
 
     async def get_unextracted_tx_hashes(self, batch_size: int = 1000) -> list[str]:
         query = """
@@ -130,14 +130,12 @@ class GraphDb:
             return [record["tx_hash"] async for record in result]
         return None
 
-
-async def main():
-    db = GraphDb()
-    try:
-        await db.generate_and_sync_sigs()
-    finally:
-        await db.close()
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    async def get_count_unextracted_tx_hashes(self) -> int:
+        query = """
+        MATCH (tx:Transaction)
+        WHERE tx.is_extracted IS NULL
+        RETURN tx.hash AS tx_hash
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query)
+            return len(await result.values())
