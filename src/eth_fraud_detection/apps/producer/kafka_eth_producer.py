@@ -43,6 +43,7 @@ class KafkaEthProducer:
                     if tx.get("input") != "0x" or not tx.get("to"):
                         continue
 
+                    eth_logger.info(tx)
                     await self.producer.send_and_wait(TRANSACTION_WRITER_TOPIC, tx)
 
         except Exception as e:

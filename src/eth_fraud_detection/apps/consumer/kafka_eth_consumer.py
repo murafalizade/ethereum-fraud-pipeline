@@ -3,6 +3,7 @@ from aiokafka import AIOKafkaConsumer
 
 from eth_fraud_detection.adapters.graph_db import GraphDb
 from eth_fraud_detection.core.constants import TRANSACTION_WRITER_TOPIC
+from eth_fraud_detection.utils.logger import eth_logger
 
 
 class KafkaEthConsumer:
@@ -32,6 +33,10 @@ class KafkaEthConsumer:
                 }
 
                 await self.graph.insert_transaction(response)
+                eth_logger.info(f"{response.get("hash")} has successfully inserted")
+
+        except Exception as e:
+            eth_logger.error(f"Error, {e}")
 
         finally:
             await self.consumer.stop()

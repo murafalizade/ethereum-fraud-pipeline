@@ -1,3 +1,4 @@
+import asyncio
 import pickle
 
 import numpy as np
@@ -9,7 +10,7 @@ from eth_fraud_detection.utils.logger import eth_logger
 
 FEATURES = [
     "value_eth",
-    "gasPrice_gwei",
+    "gas_price_gwei",
     "nonce",
     "out_degree",
     "in_degree",
@@ -20,7 +21,7 @@ FEATURES = [
 
 # Fraction of the dataset expected to be anomalous.
 # Tune this based on domain knowledge or labelled samples.
-CONTAMINATION = 0.05
+CONTAMINATION = 0.01
 
 
 def _to_matrix(records: list[dict]) -> np.ndarray:
@@ -62,3 +63,7 @@ async def run_isolation_forest(
         )
     finally:
         await db.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_isolation_forest())

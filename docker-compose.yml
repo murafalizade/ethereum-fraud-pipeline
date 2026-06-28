@@ -23,6 +23,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_ENABLE_KRAFT: 'false'
+
   neo4j:
     image: neo4j:latest
     container_name: neo4j
@@ -41,6 +42,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
   postgres:
     image: postgres:15
     container_name: postgres
@@ -57,7 +59,95 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── Airflow needs its own metadata DB ──────────────────────────────────────
+  airflow-db:
+    image: postgres:15
+    container_name: airflow-db
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── One-time DB init (runs and exits) ──────────────────────────────────────
+  airflow-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow-init
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/src/eth_fraud_detection/apps/feature_extraction # Override DAG folder
+    volumes:
+      - ./src:/opt/airflow/src  # Only map this once
+    entrypoint: [ "/bin/bash" ] # Removed the extra "-c"
+    command:
+      - -c
+      - "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+
+  # ── Scheduler: triggers DAG runs on schedule ───────────────────────────────
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/src/eth_fraud_detection/apps/feature_extraction
+      PYTHONPATH: /opt/airflow/src
+    volumes:
+      - ./src:/opt/airflow/src
+      - airflow_logs:/opt/airflow/logs
+    command: scheduler
+    restart: unless-stopped
+
+  # ── Webserver: UI at http://localhost:8080 ─────────────────────────────────
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/src/eth_fraud_detection/apps/feature_extraction
+      PYTHONPATH: /opt/airflow/src
+    volumes:
+      - ./src:/opt/airflow/src
+      - airflow_logs:/opt/airflow/logs
+    command: webserver
+    restart: unless-stopped
+
 volumes:
   neo4j_data:
   neo4j_logs:
   postgres_data:
+  airflow_db_data:                                                    # Airflow metadata
+  airflow_logs:                                                       # DAG run logs

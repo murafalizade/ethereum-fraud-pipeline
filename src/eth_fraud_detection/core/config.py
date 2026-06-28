@@ -35,7 +35,13 @@ class PostgresSettings(BaseSetting):
 
 
 class CommonSettings(BaseSetting):
-    alchemy_eth_api_key: str = Field(default="ALCHEMY_ETH_API_KEY", alias="ALCHEMY_ETH_API_KEY")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    alchemy_eth_api_key: str = Field(default="z6o_inQRnUeeb8QjhES_G")
 
 
 @lru_cache
