@@ -90,6 +90,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/src/eth_fraud_detection/apps/feature_extraction # Override DAG folder
+      PYTHONPATH: /opt/airflow/src
     volumes:
       - ./src:/opt/airflow/src  # Only map this once
     entrypoint: [ "/bin/bash" ] # Removed the extra "-c"
